@@ -7,7 +7,7 @@ import { categoryLabel, categoryOf, type ChemElement } from "@/lib/elements";
 import { buildPhaseModel, phaseAt } from "@/lib/phase";
 import { materialFor } from "@/lib/materials";
 import { spacingFactor } from "@/lib/physics";
-import { allotropeKey, structuresFor } from "@/lib/structures";
+import { structuresFor } from "@/lib/structures";
 import type { Origin } from "@/components/table/ElementCell";
 import type { ViewKey } from "@/components/three/ModalScene";
 import ElementInfo from "./ElementInfo";
@@ -41,21 +41,10 @@ export default function ElementModal({ element, origin, onClose }: Props) {
   // each element has its own slider range, so keep the temperature inside it (e.g. He tops out at a few kelvin)
   const temp = Math.min(rawTemp, model.tMax);
   const phase = phaseAt(model, temp);
-  // inter-atomic spacing: the lattice is a solid, so clamp the temperature to the solid range
-  const solidBand = model.bands[0].phase === "solid" ? model.bands[0] : null;
-  const latticeTemp = solidBand ? Math.min(temp, solidBand.upTo) : temp;
-  const latticeSpread = spacingFactor("solid", latticeTemp, pressure);
-
-  // the crystal structure itself can change with temperature (e.g. iron: BCC → FCC → BCC)
-  const aKey = allotropeKey(element.symbol, latticeTemp);
-  const structures = useMemo(
-    () => structuresFor(element.symbol, element.name, latticeTemp),
-    // rebuild only when the allotrope changes, not on every slider tick
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [element, aKey],
-  );
+  // the structure tab always shows the standard state (298 K, 1 atm); temperature and pressure are controlled in the Substance tab
+  const structures = useMemo(() => structuresFor(element.symbol, element.name, 298), [element]);
   const structure = structures ? structures[Math.min(structureIdx, structures.length - 1)] : null;
-  const hasStructureAnywhere = useMemo(() => structuresFor(element.symbol, element.name, 0) !== null, [element]);
+  const hasStructure = structures !== null;
 
   // most gases are colourless: the coloured glow is their discharge-tube emission, not their natural colour
   const spec = useMemo(() => materialFor(element), [element]);
@@ -64,7 +53,7 @@ export default function ElementModal({ element, origin, onClose }: Props) {
     view === "substance" && phase === "gas" && !naturallyColoured
       ? `The gas itself is colourless or nearly so — the ${spec.glow ? "glow" : "colour"} shown is ${spec.glow ? "its emission colour in a discharge tube" : "an artistic stand-in"}.`
       : null;
-  const spacing = view === "structure" ? latticeSpread : spacingFactor(phase, temp, pressure);
+  const spacing = spacingFactor(phase, temp, pressure);
 
   // radius that fully covers the viewport from the clicked cell
   const radius = useMemo(() => {
@@ -117,7 +106,6 @@ export default function ElementModal({ element, origin, onClose }: Props) {
                 phase={phase}
                 temp={temp}
                 pressure={pressure}
-                spread={structure?.lattice ? latticeSpread : 1}
                 structure={structure}
               />
             </motion.div>
@@ -141,7 +129,7 @@ export default function ElementModal({ element, origin, onClose }: Props) {
                     Close
                     <kbd className="rounded border border-white/20 px-1 font-mono text-[9px] text-white/45">Esc</kbd>
                   </button>
-                  <ViewTabs view={view} onChange={setView} structureAvailable={hasStructureAnywhere} />
+                  <ViewTabs view={view} onChange={setView} structureAvailable={hasStructure} />
                 </motion.div>
               </div>
 
@@ -171,46 +159,25 @@ export default function ElementModal({ element, origin, onClose }: Props) {
                 atomic mass, not from a single isotope.
               </p>
             )}
-            {view === "structure" && (
-              <div className="space-y-3">
-                {!structure && (
-                  <p className="max-w-xl text-[12px] leading-relaxed text-white/70">
-                    This form is not modelled at the current temperature (for example tin above 13 °C is body-centred tetragonal, which is not
-                    drawn here). Lower the temperature to see the crystal structure.
-                  </p>
-                )}
-                {structure && (
-                  <div className="space-y-2">
-                  {structures && structures.length > 1 && (
-                    <div className="flex gap-1">
-                      {structures.map((s, i) => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => setStructureIdx(i)}
-                          aria-pressed={i === structureIdx}
-                          className="rounded-full border border-white/20 px-3 py-1 text-[11px] uppercase tracking-[0.12em] text-white/60 transition-colors hover:text-white aria-pressed:bg-white aria-pressed:text-black"
-                        >
-                          {s.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <p className="max-w-xl text-[12px] leading-relaxed text-white/70">{structure.caption}</p>
+            {view === "structure" && structure && (
+              <div className="space-y-2">
+                {structures && structures.length > 1 && (
+                  <div className="flex gap-1">
+                    {structures.map((s, i) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setStructureIdx(i)}
+                        aria-pressed={i === structureIdx}
+                        className="rounded-full border border-white/20 px-3 py-1 text-[11px] uppercase tracking-[0.12em] text-white/60 transition-colors hover:text-white aria-pressed:bg-white aria-pressed:text-black"
+                      >
+                        {s.label}
+                      </button>
+                    ))}
                   </div>
                 )}
-                {/* molecules and single atoms barely change with T / P, so the controls would do nothing there */}
-                {(structure?.lattice || (!structure && aKey !== "")) && (
-                  <PhaseControl
-                    model={model}
-                    temp={temp}
-                    pressure={pressure}
-                    spacing={spacing}
-                    onTemp={setTemp}
-                    onPressure={setPressure}
-                    showPhases={false}
-                  />
-                )}
+                <p className="max-w-xl text-[12px] leading-relaxed text-white/70">{structure.caption}</p>
+                <p className="text-[10px] uppercase tracking-[0.14em] text-white/35">Shown at standard conditions · 298 K · 1 atm</p>
               </div>
             )}
           </motion.div>

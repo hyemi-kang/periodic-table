@@ -22,8 +22,6 @@ interface Props {
   spacing: number;
   onTemp: (t: number) => void;
   onPressure: (p: number) => void;
-  /** hide the S / L / G buttons (structure tab shows the same sliders without them) */
-  showPhases?: boolean;
   /** an extra line appended to the notes at the bottom of the card */
   extraNote?: string | null;
 }
@@ -37,7 +35,7 @@ function transitionLabel(from: Phase, to: Phase) {
 
 const fmtK = (t: number) => t.toLocaleString(undefined, { maximumFractionDigits: 1 });
 
-export default function PhaseControl({ model, temp, pressure, spacing, onTemp, onPressure, showPhases = true, extraNote }: Props) {
+export default function PhaseControl({ model, temp, pressure, spacing, onTemp, onPressure, extraNote }: Props) {
   const [equal, setEqual] = useState(false);
   const phase = phaseAt(model, temp);
   const pos = (t: number) => tempToPos(model, t, equal) * 100;
@@ -81,43 +79,33 @@ export default function PhaseControl({ model, temp, pressure, spacing, onTemp, o
   return (
     <div className="w-full max-w-2xl space-y-3 rounded-xl border border-white/12 bg-black/80 p-3.5 backdrop-blur-md sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {showPhases ? (
-          <div role="group" aria-label="Physical state" className="flex gap-1 rounded-full border border-white/15 p-1">
-            {PHASES.map((p) => {
-              const available = model.available[p];
-              const on = phase === p;
-              return (
-                <button
-                  key={p}
-                  type="button"
-                  disabled={!available}
-                  aria-pressed={on}
-                  title={available ? undefined : "Not stable at this pressure / no data"}
-                  onClick={() => onTemp(clampT(representativeTemp(model, p)))}
-                  className="relative rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-white/60 transition-colors enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-25 aria-pressed:text-black"
-                >
-                  {on && (
-                    <motion.span
-                      layoutId="phase-pill"
-                      className="absolute inset-0 rounded-full bg-white"
-                      transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                    />
-                  )}
-                  <span className="relative z-10">{LABEL[p]}</span>
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-[11px] uppercase tracking-[0.14em] text-white/50">
-            Crystal lattice
-            {phase !== "solid" && (
-              <span className="mt-0.5 block text-[10px] normal-case tracking-normal text-white/40">
-                Not solid at these conditions — spacing is held at its melting-point value.
-              </span>
-            )}
-          </p>
-        )}
+        <div role="group" aria-label="Physical state" className="flex gap-1 rounded-full border border-white/15 p-1">
+          {PHASES.map((p) => {
+            const available = model.available[p];
+            const on = phase === p;
+            return (
+              <button
+                key={p}
+                type="button"
+                disabled={!available}
+                aria-pressed={on}
+                title={available ? undefined : "Not stable at this pressure / no data"}
+                onClick={() => onTemp(clampT(representativeTemp(model, p)))}
+                className="relative rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-white/60 transition-colors enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-25 aria-pressed:text-black"
+              >
+                {on && (
+                  <motion.span
+                    layoutId="phase-pill"
+                    className="absolute inset-0 rounded-full bg-white"
+                    transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                  />
+                )}
+                <span className="relative z-10">{LABEL[p]}</span>
+              </button>
+            );
+          })}
+        </div>
+
         <p className="font-mono text-[11px] tabular-nums text-white/55" title="Relative distance between neighbouring atoms. Real changes are far smaller — the effect is exaggerated so it is visible.">
           Spacing (exaggerated) <span className="text-white">{delta >= 0 ? "+" : "−"}{Math.abs(delta).toFixed(1)}%</span>
         </p>
